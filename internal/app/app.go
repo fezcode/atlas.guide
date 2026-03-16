@@ -22,10 +22,12 @@ type tab int
 
 const (
 	tabOverview tab = iota
+	tabMonthly
 	tabCalories
 	tabGym
 	tabMood
-	tabMonthly
+	tabMedicine
+	tabDairy
 )
 
 type inputMode int
@@ -43,6 +45,10 @@ const (
 	inputGymCalories
 	inputMoodRating
 	inputMoodNote
+	inputMedicineName
+	inputMedicineDosage
+	inputDairyName
+	inputDairyAmount
 )
 
 type Model struct {
@@ -55,6 +61,8 @@ type Model struct {
 	calories data.CalorieDay
 	gym      data.GymDay
 	mood     data.MoodEntry
+	medicine data.MedicineDay
+	dairy    data.DairyDay
 
 	// UI state
 	cursor      int
@@ -75,6 +83,8 @@ type Model struct {
 	tmpFoodCalories int
 	tmpGymName      string
 	tmpGymDuration  int
+	tmpMedicineName string
+	tmpDairyName    string
 }
 
 func NewModel() Model {
@@ -108,6 +118,8 @@ func (m *Model) loadData() {
 	m.calories = data.LoadCalories(m.date)
 	m.gym = data.LoadGym(m.date)
 	m.mood = data.LoadMood(m.date)
+	m.medicine = data.LoadMedicine(m.date)
+	m.dairy = data.LoadDairy(m.date)
 	m.cursor = 0
 }
 
@@ -145,19 +157,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeTab = tabOverview
 			m.cursor = 0
 		case "2":
-			m.activeTab = tabCalories
-			m.cursor = 0
-		case "3":
-			m.activeTab = tabGym
-			m.cursor = 0
-		case "4":
-			m.activeTab = tabMood
-			m.cursor = 0
-		case "5":
 			m.activeTab = tabMonthly
 			m.cursor = 0
+		case "3":
+			m.activeTab = tabCalories
+			m.cursor = 0
+		case "4":
+			m.activeTab = tabGym
+			m.cursor = 0
+		case "5":
+			m.activeTab = tabMood
+			m.cursor = 0
+		case "6":
+			m.activeTab = tabMedicine
+			m.cursor = 0
+		case "7":
+			m.activeTab = tabDairy
+			m.cursor = 0
 		case "tab":
-			m.activeTab = (m.activeTab + 1) % 5
+			m.activeTab = (m.activeTab + 1) % 7
 			m.cursor = 0
 		case "h", "left":
 			m.date = m.date.AddDate(0, 0, -1)
@@ -304,6 +322,10 @@ func (m Model) listLen() int {
 		return len(m.calories.Entries)
 	case tabGym:
 		return len(m.gym.Activities)
+	case tabMedicine:
+		return len(m.medicine.Entries)
+	case tabDairy:
+		return len(m.dairy.Entries)
 	default:
 		return 0
 	}
@@ -327,6 +349,12 @@ func (m *Model) startAdd() {
 	case tabMood:
 		m.inputMode = inputMoodRating
 		m.input.Placeholder = "Rating 1-5 (1=terrible, 5=great)"
+	case tabMedicine:
+		m.inputMode = inputMedicineName
+		m.input.Placeholder = "Medicine name (e.g. Vitamin D)"
+	case tabDairy:
+		m.inputMode = inputDairyName
+		m.input.Placeholder = "Dairy product (e.g. Milk, Yogurt)"
 	}
 }
 
@@ -466,6 +494,50 @@ func (m Model) handleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inputMode = inputNone
 			m.input.Reset()
 			m.statusMsg = fmt.Sprintf("Mood: %s %s", ui.MoodEmoji(m.mood.Rating), ui.MoodLabel(m.mood.Rating))
+
+		case inputMedicineName:
+			m.tmpMedicineName = val
+			m.inputMode = inputMedicineDosage
+			m.input.Reset()
+			m.input.Placeholder = "Dosage (e.g. 1000 IU, 500mg)"
+			m.input.Focus()
+
+		case inputMedicineDosage:
+			entry := data.MedicineEntry{
+				Name:   m.tmpMedicineName,
+				Dosage: val,
+				Time:   time.Now().Format("15:04"),
+			}
+			m.medicine.Entries = append(m.medicine.Entries, entry)
+			_ = data.SaveMedicine(m.date, m.medicine)
+			m.inputMode = inputNone
+			m.input.Reset()
+			m.statusMsg = fmt.Sprintf("Added: %s (%s)", entry.Name, entry.Dosage)
+
+		case inputDairyName:
+			m.tmpDairyName = val
+			m.inputMode = inputDairyAmount
+			m.input.Reset()
+			m.input.Placeholder = "Amount in ml/g (e.g. 250)"
+			m.input.Focus()
+
+		case inputDairyAmount:
+			n, err := strconv.Atoi(val)
+			if err != nil || n < 0 {
+				m.statusMsg = "Enter a valid number"
+				return m, nil
+			}
+			entry := data.DairyEntry{
+				Name:   m.tmpDairyName,
+				Amount: n,
+				Unit:   "ml",
+				Time:   time.Now().Format("15:04"),
+			}
+			m.dairy.Entries = append(m.dairy.Entries, entry)
+			_ = data.SaveDairy(m.date, m.dairy)
+			m.inputMode = inputNone
+			m.input.Reset()
+			m.statusMsg = fmt.Sprintf("Added: %s (%d %s)", entry.Name, entry.Amount, entry.Unit)
 		}
 		return m, nil
 
@@ -502,6 +574,26 @@ func (m *Model) deleteEntry() {
 		m.mood = data.MoodEntry{}
 		_ = data.SaveMood(m.date, m.mood)
 		m.statusMsg = "Mood cleared"
+	case tabMedicine:
+		if m.cursor < len(m.medicine.Entries) {
+			name := m.medicine.Entries[m.cursor].Name
+			m.medicine.Entries = append(m.medicine.Entries[:m.cursor], m.medicine.Entries[m.cursor+1:]...)
+			_ = data.SaveMedicine(m.date, m.medicine)
+			if m.cursor > 0 && m.cursor >= len(m.medicine.Entries) {
+				m.cursor--
+			}
+			m.statusMsg = fmt.Sprintf("Deleted: %s", name)
+		}
+	case tabDairy:
+		if m.cursor < len(m.dairy.Entries) {
+			name := m.dairy.Entries[m.cursor].Name
+			m.dairy.Entries = append(m.dairy.Entries[:m.cursor], m.dairy.Entries[m.cursor+1:]...)
+			_ = data.SaveDairy(m.date, m.dairy)
+			if m.cursor > 0 && m.cursor >= len(m.dairy.Entries) {
+				m.cursor--
+			}
+			m.statusMsg = fmt.Sprintf("Deleted: %s", name)
+		}
 	}
 }
 
@@ -547,14 +639,18 @@ func (m Model) View() string {
 	switch m.activeTab {
 	case tabOverview:
 		content = m.viewOverview(contentWidth)
+	case tabMonthly:
+		content = m.viewMonthly(contentWidth)
 	case tabCalories:
 		content = m.viewCalories(contentWidth)
 	case tabGym:
 		content = m.viewGym(contentWidth)
 	case tabMood:
 		content = m.viewMood()
-	case tabMonthly:
-		content = m.viewMonthly(contentWidth)
+	case tabMedicine:
+		content = m.viewMedicine(contentWidth)
+	case tabDairy:
+		content = m.viewDairy(contentWidth)
 	}
 	contentBox := ui.ContentBoxStyle.Width(contentWidth).Render(content)
 	sections = append(sections, contentBox)
@@ -599,7 +695,7 @@ func (m Model) viewHeader(width int) string {
 }
 
 func (m Model) viewTabs(width int) string {
-	tabNames := []string{"📊 Overview", "🍎 Calories", "💪 Gym", "😊 Mood", "📅 Monthly"}
+	tabNames := []string{"📊 Overview", "📅 Monthly", "🍎 Calories", "💪 Gym", "😊 Mood", "💊 Medicine", "🥛 Dairy"}
 	var tabs []string
 	for i, name := range tabNames {
 		if tab(i) == m.activeTab {
@@ -629,7 +725,7 @@ func (m Model) viewFooter(width int) string {
 		)
 	}
 
-	common := fmtKey("1-5", "tabs") + "  " +
+	common := fmtKey("1-7", "tabs") + "  " +
 		fmtKey("←/→", "date") + "  " +
 		fmtKey("t", "today") + "  " +
 		fmtKey("c", "calendar") + "  "
@@ -651,6 +747,12 @@ func (m Model) viewFooter(width int) string {
 	case tabMood:
 		specific = fmtKey("a", "mood") + "  " +
 			fmtKey("d", "clear")
+	case tabMedicine:
+		specific = fmtKey("a", "add") + "  " +
+			fmtKey("d", "del")
+	case tabDairy:
+		specific = fmtKey("a", "add") + "  " +
+			fmtKey("d", "del")
 	}
 
 	right := fmtKey("?", "help") + "  " + fmtKey("q", "quit")
@@ -686,6 +788,14 @@ func (m Model) inputPromptLabel() string {
 		return "Rate your day (1-5):"
 	case inputMoodNote:
 		return fmt.Sprintf("Note for %s %s:", ui.MoodEmoji(m.mood.Rating), ui.MoodLabel(m.mood.Rating))
+	case inputMedicineName:
+		return "Enter medicine name:"
+	case inputMedicineDosage:
+		return fmt.Sprintf("Dosage for '%s':", m.tmpMedicineName)
+	case inputDairyName:
+		return "Enter dairy product:"
+	case inputDairyAmount:
+		return fmt.Sprintf("Amount (ml/g) for '%s':", m.tmpDairyName)
 	default:
 		return ""
 	}
@@ -838,6 +948,58 @@ func (m Model) viewOverview(width int) string {
 	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
 	b.WriteString("\n\n")
 
+	// ── Medicine card ──
+	b.WriteString(ui.TitleStyle.Render("💊 Medicine"))
+	b.WriteString("\n")
+
+	if len(m.medicine.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No medicine logged yet."))
+	} else {
+		b.WriteString("  " +
+			ui.LabelStyle.Render("Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.medicine.Entries))))
+		b.WriteString("\n")
+
+		b.WriteString("  " + ui.LabelStyle.Render("Log "))
+		var meds []string
+		for _, e := range m.medicine.Entries {
+			meds = append(meds, fmt.Sprintf("%s (%s)", e.Name, e.Dosage))
+		}
+		b.WriteString(ui.InfoStyle.Render(strings.Join(meds, ", ")))
+		b.WriteString("\n")
+	}
+
+	// ── Separator ──
+	b.WriteString("\n")
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString("\n\n")
+
+	// ── Dairy card ──
+	b.WriteString(ui.TitleStyle.Render("🥛 Dairy"))
+	b.WriteString("\n")
+
+	if len(m.dairy.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No dairy logged yet."))
+	} else {
+		totalDairy := data.TotalDairyAmount(m.dairy)
+		b.WriteString("  " +
+			ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d ml", totalDairy)) + "  │  " +
+			ui.LabelStyle.Render("Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.dairy.Entries))))
+		b.WriteString("\n")
+
+		b.WriteString("  " + ui.LabelStyle.Render("Log "))
+		var items []string
+		for _, e := range m.dairy.Entries {
+			items = append(items, fmt.Sprintf("%s (%d %s)", e.Name, e.Amount, e.Unit))
+		}
+		b.WriteString(ui.InfoStyle.Render(strings.Join(items, ", ")))
+		b.WriteString("\n")
+	}
+
+	// ── Separator ──
+	b.WriteString("\n")
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString("\n\n")
+
 	// ── Day score ──
 	b.WriteString(ui.TitleStyle.Render("📈 Day Score"))
 	b.WriteString("\n")
@@ -850,6 +1012,12 @@ func (m Model) viewOverview(width int) string {
 		filled++
 	}
 	if m.mood.Rating > 0 {
+		filled++
+	}
+	if len(m.medicine.Entries) > 0 {
+		filled++
+	}
+	if len(m.dairy.Entries) > 0 {
 		filled++
 	}
 
@@ -869,9 +1037,19 @@ func (m Model) viewOverview(width int) string {
 	} else {
 		checks = append(checks, ui.InfoStyle.Render("○ Mood"))
 	}
+	if len(m.medicine.Entries) > 0 {
+		checks = append(checks, ui.SuccessStyle.Render("✓ Medicine"))
+	} else {
+		checks = append(checks, ui.InfoStyle.Render("○ Medicine"))
+	}
+	if len(m.dairy.Entries) > 0 {
+		checks = append(checks, ui.SuccessStyle.Render("✓ Dairy"))
+	} else {
+		checks = append(checks, ui.InfoStyle.Render("○ Dairy"))
+	}
 
 	b.WriteString("  " + strings.Join(checks, "   "))
-	b.WriteString("   " + ui.AccentStyle.Render(fmt.Sprintf("%d/3 tracked", filled)))
+	b.WriteString("   " + ui.AccentStyle.Render(fmt.Sprintf("%d/5 tracked", filled)))
 
 	return b.String()
 }
@@ -1014,6 +1192,91 @@ func (m Model) viewGym(width int) string {
 	return b.String()
 }
 
+// ── Medicine view ──────────────────────────────────────
+
+func (m Model) viewMedicine(width int) string {
+	var b strings.Builder
+
+	b.WriteString(ui.TitleStyle.Render("Medicine Summary"))
+	b.WriteString("\n")
+
+	stats := []string{
+		ui.LabelStyle.Render("Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.medicine.Entries))),
+	}
+	b.WriteString("  " + strings.Join(stats, "  │  "))
+	b.WriteString("\n\n")
+
+	b.WriteString(ui.TitleStyle.Render("Medicine Log"))
+	b.WriteString("\n")
+
+	if len(m.medicine.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No medicine logged yet. Press 'a' to add."))
+	} else {
+		for i, e := range m.medicine.Entries {
+			cursor := "  "
+			style := ui.NormalStyle
+			if i == m.cursor {
+				cursor = ui.CursorStyle.Render("▸ ")
+				style = ui.SelectedStyle
+			}
+			name := fmt.Sprintf("%-22s", truncate(e.Name, 22))
+			line := fmt.Sprintf("%s%s %s  %s",
+				cursor,
+				style.Render(name),
+				ui.ValueStyle.Render(fmt.Sprintf("%-12s", e.Dosage)),
+				ui.InfoStyle.Render("@"+e.Time),
+			)
+			b.WriteString(line + "\n")
+		}
+	}
+
+	return b.String()
+}
+
+// ── Dairy view ─────────────────────────────────────────
+
+func (m Model) viewDairy(width int) string {
+	var b strings.Builder
+
+	totalAmount := data.TotalDairyAmount(m.dairy)
+
+	b.WriteString(ui.TitleStyle.Render("Dairy Summary"))
+	b.WriteString("\n")
+
+	stats := []string{
+		ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d ml", totalAmount)),
+		ui.LabelStyle.Render("Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.dairy.Entries))),
+	}
+	b.WriteString("  " + strings.Join(stats, "  │  "))
+	b.WriteString("\n\n")
+
+	b.WriteString(ui.TitleStyle.Render("Dairy Log"))
+	b.WriteString("\n")
+
+	if len(m.dairy.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No dairy logged yet. Press 'a' to add."))
+	} else {
+		for i, e := range m.dairy.Entries {
+			cursor := "  "
+			style := ui.NormalStyle
+			if i == m.cursor {
+				cursor = ui.CursorStyle.Render("▸ ")
+				style = ui.SelectedStyle
+			}
+			name := fmt.Sprintf("%-22s", truncate(e.Name, 22))
+			line := fmt.Sprintf("%s%s %s  %s",
+				cursor,
+				style.Render(name),
+				ui.ValueStyle.Render(fmt.Sprintf("%4d %s", e.Amount, e.Unit)),
+				ui.InfoStyle.Render("@"+e.Time),
+			)
+			b.WriteString(line + "\n")
+		}
+	}
+
+	return b.String()
+}
+
 // ── Mood view ──────────────────────────────────────────
 
 func (m Model) viewMood() string {
@@ -1090,6 +1353,7 @@ func (m Model) viewMonthly(width int) string {
 	// ── Aggregate stats ──
 	var totalConsumed, totalBurnt, totalProtein, totalGymMin, totalSessions int
 	var daysTracked, daysWithGym, moodSum, moodCount int
+	var totalMedicineDoses, daysWithMedicine, totalDairyItems, daysWithDairy int
 	for _, s := range summaries {
 		if !s.HasData {
 			continue
@@ -1106,6 +1370,14 @@ func (m Model) viewMonthly(width int) string {
 		if s.MoodRating > 0 {
 			moodSum += s.MoodRating
 			moodCount++
+		}
+		if s.MedicineCount > 0 {
+			totalMedicineDoses += s.MedicineCount
+			daysWithMedicine++
+		}
+		if s.DairyCount > 0 {
+			totalDairyItems += s.DairyCount
+			daysWithDairy++
 		}
 	}
 
@@ -1195,6 +1467,35 @@ func (m Model) viewMonthly(width int) string {
 	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
 	b.WriteString("\n\n")
 
+	// Medicine
+	b.WriteString(ui.TitleStyle.Render("💊 Medicine"))
+	b.WriteString("\n")
+	if daysWithMedicine == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No medicine data this month."))
+	} else {
+		b.WriteString("  " +
+			ui.LabelStyle.Render("Total Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalMedicineDoses)) + "  │  " +
+			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithMedicine)))
+	}
+	b.WriteString("\n\n")
+
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString("\n\n")
+
+	// Dairy
+	b.WriteString(ui.TitleStyle.Render("🥛 Dairy"))
+	b.WriteString("\n")
+	if daysWithDairy == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No dairy data this month."))
+	} else {
+		b.WriteString("  " +
+			ui.LabelStyle.Render("Total Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalDairyItems)) + "  │  " +
+			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithDairy)))
+	}
+	b.WriteString("\n\n")
+
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString("\n\n")
 	// ── Day-by-day heatmap ──
 	b.WriteString(ui.TitleStyle.Render("Day-by-Day"))
 	b.WriteString("\n")
@@ -1388,7 +1689,7 @@ func (m Model) viewHelp() string {
 		rows  []table.Row
 	}{
 		{"Navigation", []table.Row{
-			{"1-5, Tab", "Switch tabs (Overview/Cal/Gym/Mood/Monthly)"},
+			{"1-7, Tab", "Switch tabs (Overview/Monthly/Cal/Gym/Mood/Med/Dairy)"},
 			{"←/→, h/l", "Previous / Next day"},
 			{"↑/↓, j/k", "Move cursor in lists"},
 			{"t", "Jump to today"},
@@ -1403,6 +1704,14 @@ func (m Model) viewHelp() string {
 		{"Calories", []table.Row{
 			{"g", "Set daily calorie goal"},
 			{"f", "Toggle / set fasting window"},
+		}},
+		{"Medicine", []table.Row{
+			{"a", "Add medicine (name + dosage)"},
+			{"d", "Delete selected medicine"},
+		}},
+		{"Dairy", []table.Row{
+			{"a", "Add dairy item (name + amount)"},
+			{"d", "Delete selected dairy item"},
 		}},
 		{"Monthly", []table.Row{
 			{"H/L", "Previous / Next month"},

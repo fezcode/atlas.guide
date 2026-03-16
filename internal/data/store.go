@@ -49,6 +49,31 @@ type MoodEntry struct {
 	Time   string `json:"time"`
 }
 
+// MedicineEntry represents a single medicine dose logged.
+type MedicineEntry struct {
+	Name   string `json:"name"`
+	Dosage string `json:"dosage"`
+	Time   string `json:"time"`
+}
+
+// MedicineDay stores all medicine data for a single day.
+type MedicineDay struct {
+	Entries []MedicineEntry `json:"entries"`
+}
+
+// DairyEntry represents a single dairy product logged.
+type DairyEntry struct {
+	Name   string `json:"name"`
+	Amount int    `json:"amount"`
+	Unit   string `json:"unit"`
+	Time   string `json:"time"`
+}
+
+// DairyDay stores all dairy data for a single day.
+type DairyDay struct {
+	Entries []DairyEntry `json:"entries"`
+}
+
 func dataDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".atlas", "atlas.guide.data")
@@ -136,6 +161,40 @@ func SaveMood(date time.Time, entry MoodEntry) error {
 	return saveJSON(path, entry)
 }
 
+// LoadMedicine loads medicine data for a given date.
+func LoadMedicine(date time.Time) MedicineDay {
+	path := filepath.Join(dayDir(date), "medicine.json")
+	var day MedicineDay
+	_ = loadJSON(path, &day)
+	if day.Entries == nil {
+		day.Entries = []MedicineEntry{}
+	}
+	return day
+}
+
+// SaveMedicine persists medicine data for a given date.
+func SaveMedicine(date time.Time, day MedicineDay) error {
+	path := filepath.Join(dayDir(date), "medicine.json")
+	return saveJSON(path, day)
+}
+
+// LoadDairy loads dairy data for a given date.
+func LoadDairy(date time.Time) DairyDay {
+	path := filepath.Join(dayDir(date), "dairy.json")
+	var day DairyDay
+	_ = loadJSON(path, &day)
+	if day.Entries == nil {
+		day.Entries = []DairyEntry{}
+	}
+	return day
+}
+
+// SaveDairy persists dairy data for a given date.
+func SaveDairy(date time.Time, day DairyDay) error {
+	path := filepath.Join(dayDir(date), "dairy.json")
+	return saveJSON(path, day)
+}
+
 // TotalCaloriesConsumed returns total calories from food entries.
 func TotalCaloriesConsumed(day CalorieDay) int {
 	total := 0
@@ -172,6 +231,15 @@ func TotalGymDuration(day GymDay) int {
 	return total
 }
 
+// TotalDairyAmount returns total dairy amount for a day.
+func TotalDairyAmount(day DairyDay) int {
+	total := 0
+	for _, e := range day.Entries {
+		total += e.Amount
+	}
+	return total
+}
+
 // NetCalories returns consumed minus burnt.
 func NetCalories(cal CalorieDay, gym GymDay) int {
 	return TotalCaloriesConsumed(cal) - TotalCaloriesBurnt(gym)
@@ -195,6 +263,8 @@ type DaySummary struct {
 	GymDuration   int
 	GymSessions   int
 	MoodRating    int
+	MedicineCount int
+	DairyCount    int
 }
 
 // LoadDaySummary loads a lightweight summary for a single date.
@@ -202,6 +272,8 @@ func LoadDaySummary(date time.Time) DaySummary {
 	cal := LoadCalories(date)
 	gym := LoadGym(date)
 	mood := LoadMood(date)
+	med := LoadMedicine(date)
+	dairy := LoadDairy(date)
 
 	consumed := TotalCaloriesConsumed(cal)
 	burnt := TotalCaloriesBurnt(gym)
@@ -217,8 +289,10 @@ func LoadDaySummary(date time.Time) DaySummary {
 		GymDuration:   TotalGymDuration(gym),
 		GymSessions:   len(gym.Activities),
 		MoodRating:    mood.Rating,
+		MedicineCount: len(med.Entries),
+		DairyCount:    len(dairy.Entries),
 	}
-	s.HasData = len(cal.Entries) > 0 || len(gym.Activities) > 0 || mood.Rating > 0
+	s.HasData = len(cal.Entries) > 0 || len(gym.Activities) > 0 || mood.Rating > 0 || len(med.Entries) > 0 || len(dairy.Entries) > 0
 	return s
 }
 
