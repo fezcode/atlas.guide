@@ -37,6 +37,8 @@ const (
 	inputFoodName
 	inputFoodCalories
 	inputFoodProtein
+	inputFoodFat
+	inputFoodCarbs
 	inputCalorieGoal
 	inputFastStart
 	inputFastEnd
@@ -81,6 +83,8 @@ type Model struct {
 	// Temp input buffers
 	tmpFoodName     string
 	tmpFoodCalories int
+	tmpFoodProtein  int
+	tmpFoodFat      int
 	tmpGymName      string
 	tmpGymDuration  int
 	tmpMedicineName string
@@ -399,10 +403,36 @@ func (m Model) handleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Enter a valid number"
 				return m, nil
 			}
+			m.tmpFoodProtein = n
+			m.inputMode = inputFoodFat
+			m.input.Reset()
+			m.input.Placeholder = "Fat in grams (e.g. 5), or 0"
+			m.input.Focus()
+
+		case inputFoodFat:
+			n, err := strconv.Atoi(val)
+			if err != nil || n < 0 {
+				m.statusMsg = "Enter a valid number"
+				return m, nil
+			}
+			m.tmpFoodFat = n
+			m.inputMode = inputFoodCarbs
+			m.input.Reset()
+			m.input.Placeholder = "Carbs in grams (e.g. 20), or 0"
+			m.input.Focus()
+
+		case inputFoodCarbs:
+			n, err := strconv.Atoi(val)
+			if err != nil || n < 0 {
+				m.statusMsg = "Enter a valid number"
+				return m, nil
+			}
 			entry := data.FoodEntry{
 				Name:     m.tmpFoodName,
 				Calories: m.tmpFoodCalories,
-				Protein:  n,
+				Protein:  m.tmpFoodProtein,
+				Fat:      m.tmpFoodFat,
+				Carbs:    n,
 				Time:     time.Now().Format("15:04"),
 			}
 			m.calories.Entries = append(m.calories.Entries, entry)
@@ -772,6 +802,10 @@ func (m Model) inputPromptLabel() string {
 		return fmt.Sprintf("Calories for '%s':", m.tmpFoodName)
 	case inputFoodProtein:
 		return fmt.Sprintf("Protein (g) for '%s':", m.tmpFoodName)
+	case inputFoodFat:
+		return fmt.Sprintf("Fat (g) for '%s':", m.tmpFoodName)
+	case inputFoodCarbs:
+		return fmt.Sprintf("Carbs (g) for '%s':", m.tmpFoodName)
 	case inputCalorieGoal:
 		return "Set daily calorie goal:"
 	case inputFastStart:
@@ -847,6 +881,8 @@ func (m Model) viewOverview(width int) string {
 		b.WriteString("\n")
 		b.WriteString("  " +
 			ui.LabelStyle.Render("Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", protein)) + "  │  " +
+			ui.LabelStyle.Render("Fat ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", data.TotalFat(m.calories))) + "  │  " +
+			ui.LabelStyle.Render("Carbs ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", data.TotalCarbs(m.calories))) + "  │  " +
 			ui.LabelStyle.Render("Net ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", net)))
 		b.WriteString("\n")
 
@@ -1061,6 +1097,8 @@ func (m Model) viewCalories(width int) string {
 
 	consumed := data.TotalCaloriesConsumed(m.calories)
 	protein := data.TotalProtein(m.calories)
+	fat := data.TotalFat(m.calories)
+	carbs := data.TotalCarbs(m.calories)
 	burnt := data.TotalCaloriesBurnt(m.gym)
 	net := data.NetCalories(m.calories, m.gym)
 	remaining := data.CalorieRemaining(m.calories, m.gym)
@@ -1098,6 +1136,8 @@ func (m Model) viewCalories(width int) string {
 	// Stats row
 	stats := []string{
 		ui.LabelStyle.Render("Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", protein)),
+		ui.LabelStyle.Render("Fat ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", fat)),
+		ui.LabelStyle.Render("Carbs ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", carbs)),
 		ui.LabelStyle.Render("Burnt ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", burnt)),
 		ui.LabelStyle.Render("Net ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", net)),
 	}
@@ -1131,11 +1171,13 @@ func (m Model) viewCalories(width int) string {
 				style = ui.SelectedStyle
 			}
 			name := fmt.Sprintf("%-22s", truncate(e.Name, 22))
-			line := fmt.Sprintf("%s%s %s  %s  %s",
+			line := fmt.Sprintf("%s%s %s  %s  %s  %s  %s",
 				cursor,
 				style.Render(name),
 				ui.ValueStyle.Render(fmt.Sprintf("%4d cal", e.Calories)),
-				ui.LabelStyle.Render(fmt.Sprintf("%3dg", e.Protein)),
+				ui.LabelStyle.Render(fmt.Sprintf("%3dg P", e.Protein)),
+				ui.LabelStyle.Render(fmt.Sprintf("%3dg F", e.Fat)),
+				ui.LabelStyle.Render(fmt.Sprintf("%3dg C", e.Carbs)),
 				ui.InfoStyle.Render("@"+e.Time),
 			)
 			b.WriteString(line + "\n")

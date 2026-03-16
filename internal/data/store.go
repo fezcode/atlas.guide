@@ -12,6 +12,8 @@ type FoodEntry struct {
 	Name     string `json:"name"`
 	Calories int    `json:"calories"`
 	Protein  int    `json:"protein"`
+	Fat      int    `json:"fat"`
+	Carbs    int    `json:"carbs"`
 	Time     string `json:"time"`
 }
 
@@ -209,6 +211,24 @@ func TotalProtein(day CalorieDay) int {
 	total := 0
 	for _, e := range day.Entries {
 		total += e.Protein
+	}
+	return total
+}
+
+// TotalFat returns total fat from food entries.
+func TotalFat(day CalorieDay) int {
+	total := 0
+	for _, e := range day.Entries {
+		total += e.Fat
+	}
+	return total
+}
+
+// TotalCarbs returns total carbs from food entries.
+func TotalCarbs(day CalorieDay) int {
+	total := 0
+	for _, e := range day.Entries {
+		total += e.Carbs
 	}
 	return total
 }
