@@ -638,7 +638,10 @@ func (m Model) View() string {
 		return m.viewCalendar()
 	}
 
-	contentWidth := min(m.width-4, 70)
+	contentWidth := m.width - 10
+	if contentWidth < 80 {
+		contentWidth = 80
+	}
 
 	var sections []string
 
@@ -660,7 +663,7 @@ func (m Model) View() string {
 	case tabGym:
 		content = m.viewGym(contentWidth)
 	case tabMood:
-		content = m.viewMood()
+		content = m.viewMood(contentWidth)
 	case tabMedicine:
 		content = m.viewMedicine(contentWidth)
 	case tabJournal:
@@ -841,7 +844,13 @@ func (m Model) viewOverview(width int) string {
 		if pct > 1 {
 			pct = 1
 		}
-		barWidth := min(width-6, 50)
+		barWidth := width - 15
+		if barWidth > 120 {
+			barWidth = 120
+		}
+		if barWidth < 40 {
+			barWidth = 40
+		}
 		m.progressBar.Width = barWidth
 		if pct > 0.9 {
 			m.progressBar.FullColor = string(ui.ColorDanger)
@@ -899,7 +908,7 @@ func (m Model) viewOverview(width int) string {
 
 	// ── Separator ──
 	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", width-10)))
 	b.WriteString("\n\n")
 
 	// ── Gym card ──
@@ -927,7 +936,7 @@ func (m Model) viewOverview(width int) string {
 
 	// ── Separator ──
 	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", width-10)))
 	b.WriteString("\n\n")
 
 	// ── Mood card ──
@@ -963,7 +972,7 @@ func (m Model) viewOverview(width int) string {
 
 	// ── Separator ──
 	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", width-10)))
 	b.WriteString("\n\n")
 
 	// ── Medicine card ──
@@ -988,7 +997,7 @@ func (m Model) viewOverview(width int) string {
 
 	// ── Separator ──
 	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", width-10)))
 	b.WriteString("\n\n")
 
 	// ── Journal card ──
@@ -1010,7 +1019,7 @@ func (m Model) viewOverview(width int) string {
 
 	// ── Separator ──
 	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
+	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", width-6)))
 	b.WriteString("\n\n")
 
 	// ── Day score ──
@@ -1098,7 +1107,13 @@ func (m Model) viewCalories(width int) string {
 	if pct > 1 {
 		pct = 1
 	}
-	barWidth := min(width-6, 50)
+	barWidth := width - 20
+	if barWidth > 120 {
+		barWidth = 120
+	}
+	if barWidth < 40 {
+		barWidth = 40
+	}
 	m.progressBar.Width = barWidth
 	if pct > 0.9 {
 		m.progressBar.FullColor = string(ui.ColorDanger)
@@ -1110,6 +1125,12 @@ func (m Model) viewCalories(width int) string {
 	b.WriteString("  " + m.progressBar.ViewAs(pct) + fmt.Sprintf("  %d%%", int(pct*100)))
 	b.WriteString("\n\n")
 
+	// Helper for wide separators
+	sep := "  │  "
+	if width > 100 {
+		sep = "    │    "
+	}
+
 	// Stats row
 	stats := []string{
 		ui.LabelStyle.Render("Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", protein)),
@@ -1118,7 +1139,7 @@ func (m Model) viewCalories(width int) string {
 		ui.LabelStyle.Render("Burnt ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", burnt)),
 		ui.LabelStyle.Render("Net ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", net)),
 	}
-	b.WriteString("  " + strings.Join(stats, "  │  "))
+	b.WriteString("  " + strings.Join(stats, sep))
 	b.WriteString("\n")
 
 	// Fasting
@@ -1175,12 +1196,18 @@ func (m Model) viewGym(width int) string {
 	b.WriteString(ui.TitleStyle.Render("Gym Summary"))
 	b.WriteString("\n")
 
+	// Helper for wide separators
+	sep := "  │  "
+	if width > 100 {
+		sep = "    │    "
+	}
+
 	stats := []string{
 		ui.LabelStyle.Render("Burnt ") + ui.SuccessStyle.Render(fmt.Sprintf("%d cal", totalBurnt)),
 		ui.LabelStyle.Render("Duration ") + ui.ValueStyle.Render(fmt.Sprintf("%d min", totalDuration)),
 		ui.LabelStyle.Render("Activities ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.gym.Activities))),
 	}
-	b.WriteString("  " + strings.Join(stats, "  │  "))
+	b.WriteString("  " + strings.Join(stats, sep))
 	b.WriteString("\n\n")
 
 	b.WriteString(ui.TitleStyle.Render("Activities"))
@@ -1219,10 +1246,16 @@ func (m Model) viewMedicine(width int) string {
 	b.WriteString(ui.TitleStyle.Render("Medicine Summary"))
 	b.WriteString("\n")
 
+	// Helper for wide separators
+	sep := "  │  "
+	if width > 100 {
+		sep = "    │    "
+	}
+
 	stats := []string{
 		ui.LabelStyle.Render("Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.medicine.Entries))),
 	}
-	b.WriteString("  " + strings.Join(stats, "  │  "))
+	b.WriteString("  " + strings.Join(stats, sep))
 	b.WriteString("\n\n")
 
 	b.WriteString(ui.TitleStyle.Render("Medicine Log"))
@@ -1279,7 +1312,11 @@ func (m Model) viewJournal(width int) string {
 				cursor = ui.CursorStyle.Render("▸ ")
 				style = ui.SelectedStyle
 			}
-			note := fmt.Sprintf("%-40s", truncate(e.Note, 40))
+			noteWidth := width - 20
+			if noteWidth < 40 {
+				noteWidth = 40
+			}
+			note := fmt.Sprintf("%-*s", noteWidth, truncate(e.Note, noteWidth))
 			line := fmt.Sprintf("%s%s  %s",
 				cursor,
 				style.Render(note),
@@ -1294,7 +1331,7 @@ func (m Model) viewJournal(width int) string {
 
 // ── Mood view ──────────────────────────────────────────
 
-func (m Model) viewMood() string {
+func (m Model) viewMood(width int) string {
 	var b strings.Builder
 
 	b.WriteString(ui.TitleStyle.Render("Today's Mood"))
@@ -1304,13 +1341,19 @@ func (m Model) viewMood() string {
 		b.WriteString(ui.EmptyStyle.Render("  No mood entry yet. Press 'a' to log your mood."))
 		b.WriteString("\n\n")
 		b.WriteString("  " + ui.LabelStyle.Render("Rating scale:") + "\n")
+		barTotalWidth := width - 25
+		if barTotalWidth < 15 {
+			barTotalWidth = 15
+		}
 		for i := 1; i <= 5; i++ {
 			style := ui.MoodStyles[i-1]
-			bar := strings.Repeat("█", i*3) + strings.Repeat("░", 15-i*3)
-			b.WriteString(fmt.Sprintf("   %s  %s %s  %s\n",
+			fillWidth := (i * barTotalWidth) / 5
+			emptyWidth := barTotalWidth - fillWidth
+			bar := strings.Repeat("█", fillWidth) + strings.Repeat("░", emptyWidth)
+			b.WriteString(fmt.Sprintf("   %s  %s %-10s  %s\n",
 				style.Render(fmt.Sprintf("%d", i)),
 				ui.MoodEmoji(i),
-				style.Render(fmt.Sprintf("%-10s", ui.MoodLabel(i))),
+				style.Render(ui.MoodLabel(i)),
 				style.Render(bar),
 			))
 		}
@@ -1355,15 +1398,10 @@ func (m Model) viewMood() string {
 // ── Monthly view ──────────────────────────────────────
 
 func (m Model) viewMonthly(width int) string {
-	var b strings.Builder
-
 	year := m.date.Year()
 	month := m.date.Month()
 	summaries := data.LoadMonthSummaries(year, month)
 	today := time.Now()
-
-	b.WriteString(ui.TitleStyle.Render(fmt.Sprintf("📅 %s %d", month.String(), year)))
-	b.WriteString("\n\n")
 
 	// ── Aggregate stats ──
 	var totalConsumed, totalBurnt, totalProtein, totalGymMin, totalSessions int
@@ -1396,58 +1434,83 @@ func (m Model) viewMonthly(width int) string {
 		}
 	}
 
-	// ── Summary cards ──
+	// Usable width inside the ContentBox (assuming Padding(1, 4))
+	usableWidth := width - 10
+	if usableWidth < 80 {
+		usableWidth = 80
+	}
+
+	// Heatmap takes about 1/3 of the width, up to a point
+	rightWidth := 40
+	gapWidth := usableWidth / 15
+	if gapWidth < 4 {
+		gapWidth = 4
+	}
+	leftWidth := usableWidth - rightWidth - gapWidth
+	if leftWidth < 45 {
+		leftWidth = 45
+	}
+
+	// Left block: Summary cards
+	var left strings.Builder
+
+	// Helper for wide separators
+	sep := "  │  "
+	if leftWidth > 60 {
+		sep = "    │    "
+	}
+
 	// Calories
-	b.WriteString(ui.TitleStyle.Render("🍎 Calories"))
-	b.WriteString("\n")
+	left.WriteString(ui.TitleStyle.Render("🍎 Calories"))
+	left.WriteString("\n")
 	if daysTracked == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No data this month."))
+		left.WriteString(ui.EmptyStyle.Render("  No data this month."))
 	} else {
 		avgConsumed := totalConsumed / daysTracked
 		avgNet := (totalConsumed - totalBurnt) / daysTracked
 		avgProtein := totalProtein / daysTracked
 
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", totalConsumed)) + "  │  " +
-			ui.LabelStyle.Render("Avg/day ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", avgConsumed)) + "  │  " +
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", totalConsumed)) + sep +
+			ui.LabelStyle.Render("Avg/day ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", avgConsumed)) + sep +
 			ui.LabelStyle.Render("Days ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysTracked)))
-		b.WriteString("\n")
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Avg Net ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", avgNet)) + "  │  " +
-			ui.LabelStyle.Render("Avg Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", avgProtein)) + "  │  " +
+		left.WriteString("\n")
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Avg Net ") + ui.ValueStyle.Render(fmt.Sprintf("%d cal", avgNet)) + sep +
+			ui.LabelStyle.Render("Avg Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", avgProtein)) + sep +
 			ui.LabelStyle.Render("Total Protein ") + ui.ValueStyle.Render(fmt.Sprintf("%dg", totalProtein)))
 	}
-	b.WriteString("\n\n")
+	left.WriteString("\n\n")
 
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
-	b.WriteString("\n\n")
+	left.WriteString(ui.InfoStyle.Render(strings.Repeat("─", leftWidth-4)))
+	left.WriteString("\n\n")
 
 	// Gym
-	b.WriteString(ui.TitleStyle.Render("💪 Gym"))
-	b.WriteString("\n")
+	left.WriteString(ui.TitleStyle.Render("💪 Gym"))
+	left.WriteString("\n")
 	if daysWithGym == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No gym data this month."))
+		left.WriteString(ui.EmptyStyle.Render("  No gym data this month."))
 	} else {
 		avgDuration := totalGymMin / daysWithGym
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Total Burnt ") + ui.SuccessStyle.Render(fmt.Sprintf("%d cal", totalBurnt)) + "  │  " +
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Total Burnt ") + ui.SuccessStyle.Render(fmt.Sprintf("%d cal", totalBurnt)) + sep +
 			ui.LabelStyle.Render("Total Time ") + ui.ValueStyle.Render(fmt.Sprintf("%dh %dm", totalGymMin/60, totalGymMin%60)))
-		b.WriteString("\n")
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Sessions ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalSessions)) + "  │  " +
-			ui.LabelStyle.Render("Active Days ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithGym)) + "  │  " +
+		left.WriteString("\n")
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Sessions ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalSessions)) + sep +
+			ui.LabelStyle.Render("Active Days ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithGym)) + sep +
 			ui.LabelStyle.Render("Avg/session ") + ui.ValueStyle.Render(fmt.Sprintf("%d min", avgDuration)))
 	}
-	b.WriteString("\n\n")
+	left.WriteString("\n\n")
 
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
-	b.WriteString("\n\n")
+	left.WriteString(ui.InfoStyle.Render(strings.Repeat("─", leftWidth-4)))
+	left.WriteString("\n\n")
 
 	// Mood
-	b.WriteString(ui.TitleStyle.Render("😊 Mood"))
-	b.WriteString("\n")
+	left.WriteString(ui.TitleStyle.Render("😊 Mood"))
+	left.WriteString("\n")
 	if moodCount == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No mood data this month."))
+		left.WriteString(ui.EmptyStyle.Render("  No mood data this month."))
 	} else {
 		avgMood := float64(moodSum) / float64(moodCount)
 		avgRounded := int(avgMood + 0.5)
@@ -1459,13 +1522,13 @@ func (m Model) viewMonthly(width int) string {
 		}
 		style := ui.MoodStyles[avgRounded-1]
 
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Average ") + style.Render(fmt.Sprintf("%s %.1f/5", ui.MoodEmoji(avgRounded), avgMood)) + "  │  " +
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Average ") + style.Render(fmt.Sprintf("%s %.1f/5", ui.MoodEmoji(avgRounded), avgMood)) + sep +
 			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", moodCount)))
-		b.WriteString("\n")
+		left.WriteString("\n")
 
 		// Mood distribution
-		b.WriteString("  " + ui.LabelStyle.Render("Distribution "))
+		left.WriteString("  " + ui.LabelStyle.Render("Dist: "))
 		dist := [5]int{}
 		for _, s := range summaries {
 			if s.MoodRating >= 1 && s.MoodRating <= 5 {
@@ -1474,62 +1537,61 @@ func (m Model) viewMonthly(width int) string {
 		}
 		for i := 0; i < 5; i++ {
 			ms := ui.MoodStyles[i]
-			b.WriteString(ms.Render(fmt.Sprintf("%s%d ", ui.MoodEmoji(i+1), dist[i])))
+			left.WriteString(ms.Render(fmt.Sprintf("%s%d ", ui.MoodEmoji(i+1), dist[i])))
 		}
 	}
-	b.WriteString("\n\n")
+	left.WriteString("\n\n")
 
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
-	b.WriteString("\n\n")
+	left.WriteString(ui.InfoStyle.Render(strings.Repeat("─", leftWidth-4)))
+	left.WriteString("\n\n")
 
 	// Medicine
-	b.WriteString(ui.TitleStyle.Render("💊 Medicine"))
-	b.WriteString("\n")
+	left.WriteString(ui.TitleStyle.Render("💊 Medicine"))
+	left.WriteString("\n")
 	if daysWithMedicine == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No medicine data this month."))
+		left.WriteString(ui.EmptyStyle.Render("  No medicine data."))
 	} else {
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Total Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalMedicineDoses)) + "  │  " +
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Total Doses ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalMedicineDoses)) + sep +
 			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithMedicine)))
 	}
-	b.WriteString("\n\n")
+	left.WriteString("\n\n")
 
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
-	b.WriteString("\n\n")
+	left.WriteString(ui.InfoStyle.Render(strings.Repeat("─", leftWidth-4)))
+	left.WriteString("\n\n")
 
 	// Journal
-	b.WriteString(ui.TitleStyle.Render("📓 Journal"))
-	b.WriteString("\n")
+	left.WriteString(ui.TitleStyle.Render("📓 Journal"))
+	left.WriteString("\n")
 	if daysWithJournal == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No journal data this month."))
+		left.WriteString(ui.EmptyStyle.Render("  No journal data."))
 	} else {
-		b.WriteString("  " +
-			ui.LabelStyle.Render("Total Entries ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalJournalItems)) + "  │  " +
+		left.WriteString("  " +
+			ui.LabelStyle.Render("Total Entries ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalJournalItems)) + sep +
 			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithJournal)))
 	}
-	b.WriteString("\n\n")
 
-	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
-	b.WriteString("\n\n")
-	// ── Day-by-day heatmap ──
-	b.WriteString(ui.TitleStyle.Render("Day-by-Day"))
-	b.WriteString("\n")
+	// Right block: Day-by-day heatmap
+	var right strings.Builder
+	right.WriteString(ui.TitleStyle.Render("Day-by-Day Heatmap"))
+	right.WriteString("\n\n")
 
-	daysInMo := len(summaries)
+	// Heatmap spacing scales slightly with width
+	hSep := "  "
+	if width > 120 {
+		hSep = "    "
+	}
+
 	for i, s := range summaries {
 		day := i + 1
 		isToday := s.Date.Year() == today.Year() && s.Date.Month() == today.Month() && s.Date.Day() == today.Day()
-
 		dayLabel := fmt.Sprintf("%2d", day)
 
-		// Build indicator: [Cal][Gym][Mood]
 		var indicator string
 		if !s.HasData {
 			indicator = ui.InfoStyle.Render(dayLabel + "  ·  ·  ·")
 		} else {
 			var calPart, gymPart, moodPart string
-
-			// Cal indicator
 			if s.CalConsumed > 0 {
 				pct := float64(s.CalConsumed) / float64(s.CalGoal)
 				if pct > 1 {
@@ -1542,23 +1604,18 @@ func (m Model) viewMonthly(width int) string {
 			} else {
 				calPart = ui.InfoStyle.Render("   ·")
 			}
-
-			// Gym indicator
 			if s.GymSessions > 0 {
 				gymPart = ui.SuccessStyle.Render(fmt.Sprintf("%3dm", s.GymDuration))
 			} else {
 				gymPart = ui.InfoStyle.Render("   ·")
 			}
-
-			// Mood indicator
 			if s.MoodRating > 0 {
 				ms := ui.MoodStyles[s.MoodRating-1]
 				moodPart = ms.Render(ui.MoodEmoji(s.MoodRating))
 			} else {
 				moodPart = ui.InfoStyle.Render(" ·")
 			}
-
-			indicator = ui.ValueStyle.Render(dayLabel) + "  " + calPart + "  " + gymPart + "  " + moodPart
+			indicator = ui.ValueStyle.Render(dayLabel) + hSep + calPart + hSep + gymPart + hSep + moodPart
 		}
 
 		if isToday {
@@ -1566,21 +1623,27 @@ func (m Model) viewMonthly(width int) string {
 		} else {
 			indicator = "  " + indicator
 		}
+		right.WriteString(indicator + "\n")
 
-		b.WriteString(indicator + "\n")
-
-		// Print a week separator after every Sunday
 		wd := s.Date.Weekday()
-		if wd == time.Sunday && day < daysInMo {
-			b.WriteString(ui.InfoStyle.Render("  " + strings.Repeat("·", min(width-8, 30))) + "\n")
+		if wd == time.Sunday && day < len(summaries) {
+			right.WriteString(ui.InfoStyle.Render("  " + strings.Repeat("·", rightWidth-15)) + "\n")
 		}
 	}
 
-	// Legend
-	b.WriteString("\n")
-	b.WriteString(ui.InfoStyle.Render("  Day   Cal   Gym  Mood"))
+	right.WriteString("\n")
+	right.WriteString(ui.InfoStyle.Render("  Day" + strings.Repeat(" ", len(hSep)) + "Cal" + strings.Repeat(" ", len(hSep)+3) + "Gym" + strings.Repeat(" ", len(hSep)+1) + "Mood"))
 
-	return b.String()
+	// Combine
+	gap := strings.Repeat(" ", gapWidth)
+	title := ui.TitleStyle.Render(fmt.Sprintf("📅 %s %d", month.String(), year))
+	
+	return title + "\n\n" +
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			lipgloss.NewStyle().Width(leftWidth).Render(left.String()),
+			gap,
+			right.String(),
+		)
 }
 
 // ── Calendar view ──────────────────────────────────────

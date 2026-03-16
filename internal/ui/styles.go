@@ -79,7 +79,7 @@ var (
 	ContentBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorBorder).
-			Padding(1, 2)
+			Padding(1, 4)
 	FooterStyle = lipgloss.NewStyle().
 			Foreground(ColorMuted).
 			Padding(0, 1)
@@ -135,7 +135,7 @@ var (
 	CalendarBoxStyle = lipgloss.NewStyle().
 				Border(lipgloss.DoubleBorder()).
 				BorderForeground(ColorPrimary).
-				Padding(1, 2).
+				Padding(1, 4).
 				Align(lipgloss.Center)
 	CalendarTitleStyle = lipgloss.NewStyle().
 				Foreground(ColorPrimary).
