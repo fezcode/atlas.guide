@@ -27,7 +27,7 @@ const (
 	tabGym
 	tabMood
 	tabMedicine
-	tabDairy
+	tabJournal
 )
 
 type inputMode int
@@ -49,8 +49,7 @@ const (
 	inputMoodNote
 	inputMedicineName
 	inputMedicineDosage
-	inputDairyName
-	inputDairyAmount
+	inputJournalNote
 )
 
 type Model struct {
@@ -64,7 +63,7 @@ type Model struct {
 	gym      data.GymDay
 	mood     data.MoodEntry
 	medicine data.MedicineDay
-	dairy    data.DairyDay
+	journal    data.JournalDay
 
 	// UI state
 	cursor      int
@@ -88,7 +87,6 @@ type Model struct {
 	tmpGymName      string
 	tmpGymDuration  int
 	tmpMedicineName string
-	tmpDairyName    string
 }
 
 func NewModel() Model {
@@ -123,7 +121,7 @@ func (m *Model) loadData() {
 	m.gym = data.LoadGym(m.date)
 	m.mood = data.LoadMood(m.date)
 	m.medicine = data.LoadMedicine(m.date)
-	m.dairy = data.LoadDairy(m.date)
+	m.journal = data.LoadJournal(m.date)
 	m.cursor = 0
 }
 
@@ -176,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeTab = tabMedicine
 			m.cursor = 0
 		case "7":
-			m.activeTab = tabDairy
+			m.activeTab = tabJournal
 			m.cursor = 0
 		case "tab":
 			m.activeTab = (m.activeTab + 1) % 7
@@ -328,8 +326,8 @@ func (m Model) listLen() int {
 		return len(m.gym.Activities)
 	case tabMedicine:
 		return len(m.medicine.Entries)
-	case tabDairy:
-		return len(m.dairy.Entries)
+	case tabJournal:
+		return len(m.journal.Entries)
 	default:
 		return 0
 	}
@@ -356,9 +354,9 @@ func (m *Model) startAdd() {
 	case tabMedicine:
 		m.inputMode = inputMedicineName
 		m.input.Placeholder = "Medicine name (e.g. Vitamin D)"
-	case tabDairy:
-		m.inputMode = inputDairyName
-		m.input.Placeholder = "Dairy product (e.g. Milk, Yogurt)"
+	case tabJournal:
+		m.inputMode = inputJournalNote
+		m.input.Placeholder = "What's on your mind?"
 	}
 }
 
@@ -544,30 +542,16 @@ func (m Model) handleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input.Reset()
 			m.statusMsg = fmt.Sprintf("Added: %s (%s)", entry.Name, entry.Dosage)
 
-		case inputDairyName:
-			m.tmpDairyName = val
-			m.inputMode = inputDairyAmount
-			m.input.Reset()
-			m.input.Placeholder = "Amount in ml/g (e.g. 250)"
-			m.input.Focus()
-
-		case inputDairyAmount:
-			n, err := strconv.Atoi(val)
-			if err != nil || n < 0 {
-				m.statusMsg = "Enter a valid number"
-				return m, nil
+		case inputJournalNote:
+			entry := data.JournalEntry{
+				Note: val,
+				Time: time.Now().Format("15:04"),
 			}
-			entry := data.DairyEntry{
-				Name:   m.tmpDairyName,
-				Amount: n,
-				Unit:   "ml",
-				Time:   time.Now().Format("15:04"),
-			}
-			m.dairy.Entries = append(m.dairy.Entries, entry)
-			_ = data.SaveDairy(m.date, m.dairy)
+			m.journal.Entries = append(m.journal.Entries, entry)
+			_ = data.SaveJournal(m.date, m.journal)
 			m.inputMode = inputNone
 			m.input.Reset()
-			m.statusMsg = fmt.Sprintf("Added: %s (%d %s)", entry.Name, entry.Amount, entry.Unit)
+			m.statusMsg = "Journal entry added"
 		}
 		return m, nil
 
@@ -614,15 +598,15 @@ func (m *Model) deleteEntry() {
 			}
 			m.statusMsg = fmt.Sprintf("Deleted: %s", name)
 		}
-	case tabDairy:
-		if m.cursor < len(m.dairy.Entries) {
-			name := m.dairy.Entries[m.cursor].Name
-			m.dairy.Entries = append(m.dairy.Entries[:m.cursor], m.dairy.Entries[m.cursor+1:]...)
-			_ = data.SaveDairy(m.date, m.dairy)
-			if m.cursor > 0 && m.cursor >= len(m.dairy.Entries) {
+	case tabJournal:
+		if m.cursor < len(m.journal.Entries) {
+			note := truncate(m.journal.Entries[m.cursor].Note, 30)
+			m.journal.Entries = append(m.journal.Entries[:m.cursor], m.journal.Entries[m.cursor+1:]...)
+			_ = data.SaveJournal(m.date, m.journal)
+			if m.cursor > 0 && m.cursor >= len(m.journal.Entries) {
 				m.cursor--
 			}
-			m.statusMsg = fmt.Sprintf("Deleted: %s", name)
+			m.statusMsg = fmt.Sprintf("Deleted: %s", note)
 		}
 	}
 }
@@ -679,8 +663,8 @@ func (m Model) View() string {
 		content = m.viewMood()
 	case tabMedicine:
 		content = m.viewMedicine(contentWidth)
-	case tabDairy:
-		content = m.viewDairy(contentWidth)
+	case tabJournal:
+		content = m.viewJournal(contentWidth)
 	}
 	contentBox := ui.ContentBoxStyle.Width(contentWidth).Render(content)
 	sections = append(sections, contentBox)
@@ -725,7 +709,7 @@ func (m Model) viewHeader(width int) string {
 }
 
 func (m Model) viewTabs(width int) string {
-	tabNames := []string{"📊 Overview", "📅 Monthly", "🍎 Calories", "💪 Gym", "😊 Mood", "💊 Medicine", "🥛 Dairy"}
+	tabNames := []string{"📊 Overview", "📅 Monthly", "🍎 Calories", "💪 Gym", "😊 Mood", "💊 Medicine", "🥛 Journal"}
 	var tabs []string
 	for i, name := range tabNames {
 		if tab(i) == m.activeTab {
@@ -780,7 +764,7 @@ func (m Model) viewFooter(width int) string {
 	case tabMedicine:
 		specific = fmtKey("a", "add") + "  " +
 			fmtKey("d", "del")
-	case tabDairy:
+	case tabJournal:
 		specific = fmtKey("a", "add") + "  " +
 			fmtKey("d", "del")
 	}
@@ -826,10 +810,8 @@ func (m Model) inputPromptLabel() string {
 		return "Enter medicine name:"
 	case inputMedicineDosage:
 		return fmt.Sprintf("Dosage for '%s':", m.tmpMedicineName)
-	case inputDairyName:
-		return "Enter dairy product:"
-	case inputDairyAmount:
-		return fmt.Sprintf("Amount (ml/g) for '%s':", m.tmpDairyName)
+	case inputJournalNote:
+		return "Write a journal note:"
 	default:
 		return ""
 	}
@@ -1009,25 +991,20 @@ func (m Model) viewOverview(width int) string {
 	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
 	b.WriteString("\n\n")
 
-	// ── Dairy card ──
-	b.WriteString(ui.TitleStyle.Render("🥛 Dairy"))
+	// ── Journal card ──
+	b.WriteString(ui.TitleStyle.Render("📓 Journal"))
 	b.WriteString("\n")
 
-	if len(m.dairy.Entries) == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No dairy logged yet."))
+	if len(m.journal.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No journal entries yet."))
 	} else {
-		totalDairy := data.TotalDairyAmount(m.dairy)
 		b.WriteString("  " +
-			ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d ml", totalDairy)) + "  │  " +
-			ui.LabelStyle.Render("Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.dairy.Entries))))
+			ui.LabelStyle.Render("Entries ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.journal.Entries))))
 		b.WriteString("\n")
 
-		b.WriteString("  " + ui.LabelStyle.Render("Log "))
-		var items []string
-		for _, e := range m.dairy.Entries {
-			items = append(items, fmt.Sprintf("%s (%d %s)", e.Name, e.Amount, e.Unit))
-		}
-		b.WriteString(ui.InfoStyle.Render(strings.Join(items, ", ")))
+		// Show latest entry
+		latest := m.journal.Entries[len(m.journal.Entries)-1]
+		b.WriteString("  " + ui.LabelStyle.Render("Latest ") + ui.InfoStyle.Render(truncate(latest.Note, 40)))
 		b.WriteString("\n")
 	}
 
@@ -1053,7 +1030,7 @@ func (m Model) viewOverview(width int) string {
 	if len(m.medicine.Entries) > 0 {
 		filled++
 	}
-	if len(m.dairy.Entries) > 0 {
+	if len(m.journal.Entries) > 0 {
 		filled++
 	}
 
@@ -1078,10 +1055,10 @@ func (m Model) viewOverview(width int) string {
 	} else {
 		checks = append(checks, ui.InfoStyle.Render("○ Medicine"))
 	}
-	if len(m.dairy.Entries) > 0 {
-		checks = append(checks, ui.SuccessStyle.Render("✓ Dairy"))
+	if len(m.journal.Entries) > 0 {
+		checks = append(checks, ui.SuccessStyle.Render("✓ Journal"))
 	} else {
-		checks = append(checks, ui.InfoStyle.Render("○ Dairy"))
+		checks = append(checks, ui.InfoStyle.Render("○ Journal"))
 	}
 
 	b.WriteString("  " + strings.Join(checks, "   "))
@@ -1275,41 +1252,37 @@ func (m Model) viewMedicine(width int) string {
 	return b.String()
 }
 
-// ── Dairy view ─────────────────────────────────────────
+// ── Journal view ─────────────────────────────────────────
 
-func (m Model) viewDairy(width int) string {
+func (m Model) viewJournal(width int) string {
 	var b strings.Builder
 
-	totalAmount := data.TotalDairyAmount(m.dairy)
-
-	b.WriteString(ui.TitleStyle.Render("Dairy Summary"))
+	b.WriteString(ui.TitleStyle.Render("Journal"))
 	b.WriteString("\n")
 
 	stats := []string{
-		ui.LabelStyle.Render("Total ") + ui.ValueStyle.Render(fmt.Sprintf("%d ml", totalAmount)),
-		ui.LabelStyle.Render("Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.dairy.Entries))),
+		ui.LabelStyle.Render("Entries ") + ui.ValueStyle.Render(fmt.Sprintf("%d", len(m.journal.Entries))),
 	}
 	b.WriteString("  " + strings.Join(stats, "  │  "))
 	b.WriteString("\n\n")
 
-	b.WriteString(ui.TitleStyle.Render("Dairy Log"))
+	b.WriteString(ui.TitleStyle.Render("Notes"))
 	b.WriteString("\n")
 
-	if len(m.dairy.Entries) == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No dairy logged yet. Press 'a' to add."))
+	if len(m.journal.Entries) == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No journal entries yet. Press 'a' to write."))
 	} else {
-		for i, e := range m.dairy.Entries {
+		for i, e := range m.journal.Entries {
 			cursor := "  "
 			style := ui.NormalStyle
 			if i == m.cursor {
 				cursor = ui.CursorStyle.Render("▸ ")
 				style = ui.SelectedStyle
 			}
-			name := fmt.Sprintf("%-22s", truncate(e.Name, 22))
-			line := fmt.Sprintf("%s%s %s  %s",
+			note := fmt.Sprintf("%-40s", truncate(e.Note, 40))
+			line := fmt.Sprintf("%s%s  %s",
 				cursor,
-				style.Render(name),
-				ui.ValueStyle.Render(fmt.Sprintf("%4d %s", e.Amount, e.Unit)),
+				style.Render(note),
 				ui.InfoStyle.Render("@"+e.Time),
 			)
 			b.WriteString(line + "\n")
@@ -1395,7 +1368,7 @@ func (m Model) viewMonthly(width int) string {
 	// ── Aggregate stats ──
 	var totalConsumed, totalBurnt, totalProtein, totalGymMin, totalSessions int
 	var daysTracked, daysWithGym, moodSum, moodCount int
-	var totalMedicineDoses, daysWithMedicine, totalDairyItems, daysWithDairy int
+	var totalMedicineDoses, daysWithMedicine, totalJournalItems, daysWithJournal int
 	for _, s := range summaries {
 		if !s.HasData {
 			continue
@@ -1417,9 +1390,9 @@ func (m Model) viewMonthly(width int) string {
 			totalMedicineDoses += s.MedicineCount
 			daysWithMedicine++
 		}
-		if s.DairyCount > 0 {
-			totalDairyItems += s.DairyCount
-			daysWithDairy++
+		if s.JournalCount > 0 {
+			totalJournalItems += s.JournalCount
+			daysWithJournal++
 		}
 	}
 
@@ -1524,15 +1497,15 @@ func (m Model) viewMonthly(width int) string {
 	b.WriteString(ui.InfoStyle.Render(strings.Repeat("─", min(width-4, 60))))
 	b.WriteString("\n\n")
 
-	// Dairy
-	b.WriteString(ui.TitleStyle.Render("🥛 Dairy"))
+	// Journal
+	b.WriteString(ui.TitleStyle.Render("📓 Journal"))
 	b.WriteString("\n")
-	if daysWithDairy == 0 {
-		b.WriteString(ui.EmptyStyle.Render("  No dairy data this month."))
+	if daysWithJournal == 0 {
+		b.WriteString(ui.EmptyStyle.Render("  No journal data this month."))
 	} else {
 		b.WriteString("  " +
-			ui.LabelStyle.Render("Total Items ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalDairyItems)) + "  │  " +
-			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithDairy)))
+			ui.LabelStyle.Render("Total Entries ") + ui.ValueStyle.Render(fmt.Sprintf("%d", totalJournalItems)) + "  │  " +
+			ui.LabelStyle.Render("Days Logged ") + ui.ValueStyle.Render(fmt.Sprintf("%d", daysWithJournal)))
 	}
 	b.WriteString("\n\n")
 
@@ -1731,7 +1704,7 @@ func (m Model) viewHelp() string {
 		rows  []table.Row
 	}{
 		{"Navigation", []table.Row{
-			{"1-7, Tab", "Switch tabs (Overview/Monthly/Cal/Gym/Mood/Med/Dairy)"},
+			{"1-7, Tab", "Switch tabs (Overview/Monthly/Cal/Gym/Mood/Med/Journal)"},
 			{"←/→, h/l", "Previous / Next day"},
 			{"↑/↓, j/k", "Move cursor in lists"},
 			{"t", "Jump to today"},
@@ -1751,9 +1724,9 @@ func (m Model) viewHelp() string {
 			{"a", "Add medicine (name + dosage)"},
 			{"d", "Delete selected medicine"},
 		}},
-		{"Dairy", []table.Row{
-			{"a", "Add dairy item (name + amount)"},
-			{"d", "Delete selected dairy item"},
+		{"Journal", []table.Row{
+			{"a", "Write a journal note"},
+			{"d", "Delete selected note"},
 		}},
 		{"Monthly", []table.Row{
 			{"H/L", "Previous / Next month"},

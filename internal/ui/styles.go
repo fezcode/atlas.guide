@@ -49,12 +49,12 @@ var (
 			BorderForeground(ColorPrimary).
 			Foreground(ColorPrimary).
 			Bold(true).
-			Padding(0, 2)
+			Padding(0, 1)
 	InactiveTabStyle = lipgloss.NewStyle().
 				Border(TabBorder).
 				BorderForeground(ColorBorder).
 				Foreground(ColorMuted).
-				Padding(0, 2)
+				Padding(0, 1)
 	TabGapStyle = lipgloss.NewStyle().
 			Border(lipgloss.Border{Bottom: "─"}).
 			BorderForeground(ColorBorder).

@@ -47,7 +47,7 @@ func showHelp() {
 	fmt.Println("  4 - Gym         Log workouts, duration, calories burnt")
 	fmt.Println("  5 - Mood        Rate your day (1-5) with notes")
 	fmt.Println("  6 - Medicine    Track medication name & dosage")
-	fmt.Println("  7 - Dairy       Track dairy products & amounts")
+	fmt.Println("  7 - Journal     Daily journal notes")
 	fmt.Println()
 	fmt.Println("Controls:")
 	fmt.Println("  1-7, Tab         Switch tabs")
